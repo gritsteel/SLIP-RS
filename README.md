@@ -2,8 +2,8 @@
 ```bash
 conda create -n remoteclip_ft python=3.10 -y
 conda activate remoteclip_ft
-
 pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+cd /SLIP-RS/RemoteCLIP_ft/
 pip install -r requirements.txt
 ```
 
@@ -14,6 +14,8 @@ conda activate sliprs
 pip install torch==1.13.0+cu116 torchvision==0.14.0+cu116 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu116
 pip install -U openmim
 mim install mmcv-full==1.7.1
+pip install -r requirements.txt
+cd /SLIP-RS/mmdetection_sliprs/
 pip install -v -e .
 pip install ftfy regex numpy==1.26.1 yapf==0.40.1
 ```
