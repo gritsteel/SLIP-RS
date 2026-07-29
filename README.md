@@ -1,54 +1,24 @@
-# SLIP-RS: Structured-Attribute Language-Image Pre-Training for Remote Sensing Object Detection
-
-<p align="center">
-    <a href="https://arxiv.org/pdf/2605.23144"><img src="https://img.shields.io/badge/Arxiv-2408.09110-b31b1b.svg?logo=arXiv"></a>
-</p>
-
-
-## Abstract
-Existing language-image pre-training methods for remote sensing object detection are constrained by Monolithic Label Learning, which relies on exhaustively enumerating open-set categories via black-box data to acquire fine-grained representations. This paradigm introduces a strong dependency on large-scale labeled data, which is fundamentally incompatible with the inherent data scarcity in remote sensing scenarios.
-To transcend this bottleneck, we propose **SLIP-RS**, a **Structured-Attribute Decoupling Paradigm** that maps the open-ended category space into a finite and physically meaningful attribute space. This formulation enables fine-grained discriminability through explicit structural reasoning.
-Our approach is built upon two key technical pillars:
-- **Structured-Attribute Contrastive Learning (SACL).** Enforces the learning of disentangled intrinsic visual representations via combinatorial attribute augmentation.
-- **Conformal Attribute Reliability Engine (CARE).** Leverages conformal prediction theory to distill high-fidelity supervision from noisy data sources, resulting in RS-Attribute-15M, the largest remote sensing attribute dataset with over 15 million annotations.
-
-Extensive experiments demonstrate that **SLIP-RS** achieves state-of-the-art performance in both fine-grained object detection and cross-domain generalization.
-
-<p align="center">
-  <img src="./figures/motivation.png" width="800"/>
-</p>
-
----
-
-
-## Approach
-<p align="center">
-  <img src="./figures/pipeline.png" width="800"/>
-</p>
-
----
-
-
-## (b) SACL for Classification
-
-We construct a structured-attribute classification dataset covering three primary remote sensing categories: plane, ship, and vehicle, and use it to fine-tune a RemoteCLIP-ViT-B model.
-This classification stage serves two purposes:
-- **Pseudo-label generation for CARE.** The fine-tuned model is used as the teacher to produce high-quality attribute pseudo-labels in the Conformal Attribute Reliability Engine (CARE).
-- **Text encoder initialization for detection.** The aligned text encoder learned through SACL is directly reused to initialize the text branch of the downstream detection model, enabling effective vision-language alignment at the attribute level.
-
-### Environment
+### Install Environment x 2
 ```bash
-cd RemoteCLIP_ft
 conda create -n remoteclip_ft python=3.10 -y
 conda activate remoteclip_ft
 
-pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 \
-  --index-url https://download.pytorch.org/whl/cu121
-
+pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
 ```
 
-### Data
+```bash
+conda create -n sliprs python=3.10 -y
+conda activate sliprs
+
+pip install torch==1.13.0+cu116 torchvision==0.14.0+cu116 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu116
+pip install -U openmim
+mim install mmcv-full==1.7.1
+pip install -v -e .
+pip install ftfy regex numpy==1.26.1 yapf==0.40.1
+```
+
+### Data_1
 Please download the dataset via [Baidu Cloud](https://pan.baidu.com/s/1XNscwBdndGjwih_zk8EzfQ)(udnm) and organize the dataset as follows:
 
 ```bash
@@ -63,41 +33,7 @@ RemoteCLIP_ft/
 │   │       └── label/
 ```
 
-### Pretrain Weights
-Please download the following pretrained checkpoints:
-- **RemoteCLIP ViT-B-32** from [RemoteCLIP repository](https://github.com/ChenDelong1999/RemoteCLIP?utm_source=chatgpt.com)  
-  → download: `RemoteCLIP-ViT-B-32.pt`
-- **OpenAI CLIP ViT-B-32** from [OpenAI CLIP repository](https://github.com/openai/CLIP?utm_source=chatgpt.com)  
-  → download: `ViT-B-32.pt`
-
-After downloading, put them in `pretrain_weights` folder.
-
-
-### Train
-```bash
-bash ./scripts/train_dist.sh
-```
-Our fine-tuned **RemoteCLIP-FG** checkpoint can be downloaded from:
-[Google Drive](https://drive.google.com/file/d/1cEgcDZsyNZWRYzasrCKexooWd85EVcJu/view?usp=sharing&utm_source=chatgpt.com)
-
-
-## (c) SACL for Detection
-
-
-### Enviroment
-```bash
-conda create -n sliprs python==3.10 -y
-conda activate sliprs
-cd mmdetection_sliprs
-ip install torch==1.13.0+cu116 torchvision==0.14.0+cu116 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu116
-pip install -U openmim
-mim install mmcv-full==1.7.1
-cd mmdetection_sliprs
-pip install -v -e .
-pip install ftfy regex numpy==1.26.1 yapf==0.40.1
-```
-
-### Data
+### Data_2
 
 SLIP-RS is trained on both open-source remote sensing datasets and large-scale curated datasets:
 
@@ -206,6 +142,24 @@ Please download the following pretrained checkpoints:
 
 After downloading, put them in `model_weights` folder.
 
+
+
+Put these three files in `mmdetection_sliprs\model_weights\`:
+
+```text
+dinov3_convnext_tiny_pretrain_lvd1689m-21b726bb.pth
+remoteclip_ft.pth
+SLIP_RS_T.pth
+```
+
+Use the new `slip-rs_convnext-t_lora-clip_fpn_1x_6gb.py` configuration. It keeps the SLIP-RS-T model but lowers the inference image size to 800 x 800, limits RPN proposals to 500, and returns at most 300 detections. It is an inference-speed/memory setting, not a paper-result reproduction setting.
+
+```powershell
+python .\tools\sliprs_infer_visualize.py .\sliprs_configs\slip-rs_convnext-t_lora-clip_fpn_1x_6gb.py .\model_weights\SLIP_RS_T.pth .\tools\plane.png --prompt "Plane+Twin-engine" "Plane+Four-engine" --score-thr 0.3 --out-dir .\sliprs_vis_results --device cuda:0
+```
+
+If CUDA runs out of memory, close GPU-heavy desktop applications first. If that is not enough, edit only `low_vram_img_scale` from `(800, 800)` to `(640, 640)` and `low_vram_rpn_proposals` from `500` to `300` in the low-VRAM configuration. This can reduce small-object recall. Do not use the SLIP-RS-L checkpoint on this GPU.
+
 ### Train
 ```bash
 bash ./tools/dist_train.sh ./sliprs_configs/slip-rs_convnext-t_lora-clip_fpn_1x_rs-attri.py 8
@@ -223,7 +177,7 @@ Our pretrained model weights:
 bash ./tools/dist_test.sh ./sliprs_configs/slip-rs_convnext-t_lora-clip_fpn_1x_rs-attri.py ./path/to/SLIP_RS_T.pth 8 --eval bbox
 ```
 
-### Visualization
+### Visualization (paper/default configuration)
 ```bash
 python ./tools/sliprs_infer_visualize.py ./sliprs_configs/slip-rs_convnext-t_lora-clip_fpn_1x.py ./path/to/SLIP_RS_T.pth ./tools/plane.png --prompt ['plane+twin-engines', 'plane+four-engines'] --out-dir ./
 ```
